@@ -155,21 +155,13 @@ body { -webkit-text-size-adjust: 100%; }
   </section>
 
   <section class="panel" id="setup" hidden>
-    <h2>إعداد الحسابات (أول مرة)</h2>
-    <p class="note" style="margin:0 0 14px">اختار حسابين. المسؤول يعدل المستحضرات والأوزان، والمستخدم يشوف ويحسب بس. بيانات المستحضرات تنخزن مشفّرة بكلمة المرور (8 حروف أو أرقام على الأقل، واختارها قوية)، فإذا ضاعت كلمتا المرور ما تنسترجع البيانات.</p>
+    <h2>إنشاء حساب المسؤول (أول مرة)</h2>
+    <p class="note" style="margin:0 0 14px">اختار اسم وكلمة مرور للمسؤول (8 حروف أو أرقام على الأقل، واختارها قوية). بعد الدخول تكدر تضيف حساب المستخدم (عرض فقط) من قسم «الحسابات». بيانات المستحضرات تنخزن مشفّرة، فإذا ضاعت كلمة مرور المسؤول ما تنسترجع البيانات.</p>
     <div class="fields">
-      <div class="grp">
-        <h3>حساب المسؤول (تعديل)</h3>
-        <label for="su0">اسم المستخدم<input id="su0" autocomplete="username"></label>
-        <label for="sp0">كلمة المرور<input id="sp0" type="password" autocomplete="new-password"></label>
-      </div>
-      <div class="grp">
-        <h3>حساب المستخدم (عرض فقط)</h3>
-        <label for="su1">اسم المستخدم<input id="su1" autocomplete="off"></label>
-        <label for="sp1">كلمة المرور<input id="sp1" type="password" autocomplete="off"></label>
-      </div>
+      <label for="su0">اسم المستخدم<input id="su0" autocomplete="username"></label>
+      <label for="sp0">كلمة المرور<input id="sp0" type="password" autocomplete="new-password"></label>
     </div>
-    <div class="bar"><button class="btn" id="setupGo" type="button">حفظ وإنشاء الحسابين</button></div>
+    <div class="bar"><button class="btn" id="setupGo" type="button">إنشاء الحساب</button></div>
     <p class="msg" id="smsg" role="status"></p>
   </section>
 
@@ -259,9 +251,9 @@ body { -webkit-text-size-adjust: 100%; }
         <label for="ap0">كلمة مرور جديدة (اتركها فاضية بدون تغيير)<input id="ap0" type="password" autocomplete="new-password"></label>
       </div>
       <div class="grp">
-        <h3>المستخدم (عرض فقط)</h3>
+        <h3 id="vh">المستخدم (عرض فقط)</h3>
         <label for="au1">اسم المستخدم<input id="au1"></label>
-        <label for="ap1">كلمة مرور جديدة (اتركها فاضية بدون تغيير)<input id="ap1" type="password" autocomplete="new-password"></label>
+        <label for="ap1"><span id="ap1l">كلمة مرور جديدة (اتركها فاضية بدون تغيير)</span><input id="ap1" type="password" autocomplete="new-password"></label>
       </div>
     </div>
     <div class="bar"><button class="btn alt" id="accApply" type="button">تطبيق تغييرات الحسابات</button></div>
@@ -380,17 +372,16 @@ body { -webkit-text-size-adjust: 100%; }
 
   $("setupGo").onclick = function () {
     if (!needCrypto()) { msg("smsg", "المتصفح ما يدعم التشفير المطلوب."); return; }
-    var u0 = $("su0").value.trim(), u1 = $("su1").value.trim(), p0 = $("sp0").value, p1 = $("sp1").value;
-    if (!u0 || !u1) { msg("smsg", "اكتب اسم مستخدم لكل حساب."); return; }
-    if (norm(u0) === norm(u1)) { msg("smsg", "اسما المستخدمين لازم يكونون مختلفين."); return; }
-    if (p0.length < MINPW || p1.length < MINPW) { msg("smsg", "كلمة المرور لازم تكون " + MINPW + " حروف أو أرقام على الأقل."); return; }
+    var u0 = $("su0").value.trim(), p0 = $("sp0").value;
+    if (!u0) { msg("smsg", "اكتب اسم المستخدم."); return; }
+    if (p0.length < MINPW) { msg("smsg", "كلمة المرور لازم تكون " + MINPW + " حروف أو أرقام على الأقل."); return; }
     $("setupGo").disabled = true; msg("smsg", "جاري الإنشاء…");
     var raw = rnd(32);
-    Promise.all([wrap(raw, p0), wrap(raw, p1), dekKey(raw)]).then(function (r) {
-      accounts = [Object.assign({ u: u0, r: "admin" }, r[0]), Object.assign({ u: u1, r: "viewer" }, r[1])];
+    Promise.all([wrap(raw, p0), dekKey(raw)]).then(function (r) {
+      accounts = [Object.assign({ u: u0, r: "admin" }, r[0])];
       var example = [{ id: "ex1", name: "مثال: كريم", rows: [{ n: "المادة الفعالة", w: 5 }, { n: "مادة مساعدة 1", w: 57 }, { n: "مادة مساعدة 2", w: 28.5 }, { n: "مادة مساعدة 3", w: 9.5 }] }];
-      enter(accounts[0], raw, r[2], { preps: example }, false);
-      renderAll(); markDirty(); setSave("اضغط «تنزيل ملف البيانات» وارفعه على GitHub حتى تثبت الحسابات", "bad");
+      enter(accounts[0], raw, r[1], { preps: example }, false);
+      renderAll(); markDirty(); setSave("اضغط «تنزيل ملف البيانات» وارفعه على GitHub حتى يثبت الحساب", "bad");
     }, function () { msg("smsg", "تعذر الإنشاء."); }).then(function () { $("setupGo").disabled = false; });
   };
 
@@ -418,20 +409,21 @@ body { -webkit-text-size-adjust: 100%; }
 
   /* ---------- accounts (admin) ---------- */
   $("accApply").onclick = function () {
-    var u0 = $("au0").value.trim(), u1 = $("au1").value.trim(), p0 = $("ap0").value, p1 = $("ap1").value;
-    if (!u0 || !u1) { msg("cmsg", "اكتب اسم مستخدم لكل حساب."); return; }
-    if (norm(u0) === norm(u1)) { msg("cmsg", "اسما المستخدمين لازم يكونون مختلفين."); return; }
+    var u0 = $("au0").value.trim(), u1 = $("au1").value.trim(), p0 = $("ap0").value, p1 = $("ap1").value, hasV = accounts.length > 1;
+    if (!u0) { msg("cmsg", "اكتب اسم المسؤول."); return; }
+    if (!hasV && (u1 || p1) && !(u1 && p1)) { msg("cmsg", "لإنشاء حساب المستخدم اكتب الاسم وكلمة المرور."); return; }
+    if (hasV && !u1) { msg("cmsg", "اكتب اسم المستخدم."); return; }
+    if (u1 && norm(u0) === norm(u1)) { msg("cmsg", "اسما المستخدمين لازم يكونون مختلفين."); return; }
     if ((p0 && p0.length < MINPW) || (p1 && p1.length < MINPW)) { msg("cmsg", "كلمة المرور لازم تكون " + MINPW + " حروف أو أرقام على الأقل."); return; }
-    var jobs = [Promise.resolve(null), Promise.resolve(null)];
-    if (p0) jobs[0] = wrap(dekRaw, p0);
-    if (p1) jobs[1] = wrap(dekRaw, p1);
+    var jobs = [p0 ? wrap(dekRaw, p0) : Promise.resolve(null), p1 ? wrap(dekRaw, p1) : Promise.resolve(null)];
     Promise.all(jobs).then(function (r) {
       accounts[0] = Object.assign({}, accounts[0], { u: u0 }, r[0] || {});
-      accounts[1] = Object.assign({}, accounts[1], { u: u1 }, r[1] || {});
+      if (hasV) accounts[1] = Object.assign({}, accounts[1], { u: u1 }, r[1] || {});
+      else if (u1 && r[1]) accounts[1] = Object.assign({ u: u1, r: "viewer" }, r[1]);
       var remembered = !!localStorage.getItem("prep-sess");
       user = accounts[0].u; writeSess(remembered); $("who").textContent = user + " (مسؤول)";
       $("ap0").value = ""; $("ap1").value = "";
-      msg("cmsg", "اضغط «تنزيل ملف البيانات» وارفعه حتى تثبت التغييرات.", true); markDirty();
+      msg("cmsg", "اضغط «تنزيل ملف البيانات» وارفعه حتى تثبت التغييرات.", true); markDirty(); renderAll();
     }, function () { msg("cmsg", "تعذر تطبيق التغييرات."); });
   };
 
@@ -475,7 +467,9 @@ body { -webkit-text-size-adjust: 100%; }
     $("empty").hidden = !!p; $("mainbody").hidden = !p;
     if (role === "admin") {
       $("editor").hidden = !p;
-      setVal($("au0"), accounts[0].u); setVal($("au1"), accounts[1].u);
+      setVal($("au0"), accounts[0].u); setVal($("au1"), accounts[1] ? accounts[1].u : "");
+      $("vh").textContent = accounts[1] ? "المستخدم (عرض فقط)" : "إنشاء حساب المستخدم (عرض فقط)";
+      $("ap1l").textContent = accounts[1] ? "كلمة مرور جديدة (اتركها فاضية بدون تغيير)" : "كلمة المرور";
     }
     if (!p) return;
     if (edSel !== sel || sig(p) !== curSig) buildEditor(p);

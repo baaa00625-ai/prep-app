@@ -54,7 +54,8 @@ body { background: var(--bg); color: var(--fg); font-family: var(--font-body); f
   padding-block: 20px 48px;
   padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
 .wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
-.top { display: flex; align-items: center; gap: 12px; }
+.top { display: flex; align-items: center; flex-wrap: wrap; gap: 10px 12px; }
+.top > div:first-child { flex: 1 1 180px; min-width: 0; }
 h1 { font-family: var(--font-display); font-weight: 800; font-size: 26px; margin: 0; line-height: 1.2; }
 h2 { font-family: var(--font-display); font-weight: 700; font-size: 18px; margin: 0 0 12px; }
 .sub { color: var(--muted); margin: 2px 0 0; font-size: 13px; }
@@ -97,15 +98,15 @@ input.big { font-size: 20px; font-weight: 700; }
 .tablebox { overflow-x: auto; }
 table { width: 100%; border-collapse: collapse; }
 table.in { min-width: 440px; }
-table.out { min-width: 360px; }
-th { background: var(--head); color: var(--head-fg); font-weight: 600; font-size: 13px; padding: 10px 8px; text-align: center; }
+table.out { min-width: 0; }
+th { background: var(--head); color: var(--head-fg); font-weight: 600; font-size: 13px; padding: 10px 6px; text-align: center; }
 th.want { background: var(--accent); color: var(--accent-fg); }
 th:first-child { border-top-right-radius: 8px; } th:last-child { border-top-left-radius: 8px; }
 td { padding: 6px; border-bottom: 1px solid var(--line); text-align: center; font-variant-numeric: tabular-nums; }
 td.name { text-align: right; padding-inline: 10px; font-weight: 600; }
 td.calc { direction: ltr; font-weight: 600; }
 td.want { font-weight: 700; direction: ltr; font-size: 17px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
-td.want input { font-weight: 700; font-size: 17px; }
+td.want input { font-weight: 700; font-size: 16px; padding-inline: 4px; }
 td small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
 td.in-name { text-align: right; }
 tr.total td { border-bottom: 0; border-top: 2px solid var(--fg); font-weight: 800; font-family: var(--font-display); font-size: 16px; }

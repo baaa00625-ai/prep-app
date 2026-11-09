@@ -168,12 +168,22 @@ body { -webkit-text-size-adjust: 100%; }
   <section class="panel" id="login" hidden>
     <h2>تسجيل الدخول</h2>
     <div class="fields">
-      <label for="lu">اسم المستخدم<input id="lu" autocomplete="username"></label>
-      <label for="lp">كلمة المرور<input id="lp" type="password" autocomplete="current-password"></label>
+      <div class="grp">
+        <h3>حساب المسؤول (تعديل)</h3>
+        <label for="lu0">اسم المستخدم<input id="lu0" autocomplete="username"></label>
+        <label for="lp0">كلمة المرور<input id="lp0" type="password" autocomplete="current-password"></label>
+        <button class="btn" id="loginGo0" type="button">دخول كمسؤول</button>
+        <p class="msg" id="lmsg0" role="status" style="margin:0"></p>
+      </div>
+      <div class="grp">
+        <h3>حساب المستخدم (عرض فقط)</h3>
+        <label for="lu1">اسم المستخدم<input id="lu1" autocomplete="username"></label>
+        <label for="lp1">كلمة المرور<input id="lp1" type="password" autocomplete="current-password"></label>
+        <button class="btn" id="loginGo1" type="button">دخول كمستخدم</button>
+        <p class="msg" id="lmsg1" role="status" style="margin:0"></p>
+      </div>
     </div>
     <label class="chk" for="rem"><input id="rem" type="checkbox"> تذكرني على هذا الجهاز</label>
-    <div class="bar"><button class="btn" id="loginGo" type="button">دخول</button></div>
-    <p class="msg" id="lmsg" role="status"></p>
   </section>
 
   <section class="panel" id="main" hidden>
@@ -357,18 +367,23 @@ body { -webkit-text-size-adjust: 100%; }
     preps = normalize(data.preps); sel = preps.length ? preps[0].id : null; edSel = null;
     writeSess(!!remember);
   }
-  $("loginGo").onclick = function () {
-    if (!needCrypto()) { msg("lmsg", "المتصفح ما يدعم التشفير المطلوب."); return; }
-    var acc = findAcc($("lu").value), pw = $("lp").value, bad = "اسم المستخدم أو كلمة المرور غلط.";
-    if (!acc || !pw) { msg("lmsg", bad); return; }
-    $("loginGo").disabled = true; msg("lmsg", "جاري التحقق…");
+  function doLogin(role) {
+    var k = role === "admin" ? 0 : 1, mid = "lmsg" + k;
+    if (!needCrypto()) { msg(mid, "المتصفح ما يدعم التشفير المطلوب."); return; }
+    var acc = findAcc($("lu" + k).value), pw = $("lp" + k).value, bad = "اسم المستخدم أو كلمة المرور غلط.";
+    if (!acc || acc.r !== role || !pw) { msg(mid, bad); return; }
+    $("loginGo" + k).disabled = true; msg(mid, "جاري التحقق…"); msg("lmsg" + (1 - k), "");
     unwrap(acc, pw).then(function (raw) {
       return dekKey(raw).then(function (key) { return decData(key, envD).then(function (data) {
-        $("lp").value = ""; msg("lmsg", ""); enter(acc, raw, key, data, $("rem").checked); renderAll();
+        $("lp0").value = ""; $("lp1").value = ""; msg(mid, ""); enter(acc, raw, key, data, $("rem").checked); renderAll();
       }); });
-    }).catch(function () { msg("lmsg", bad); }).then(function () { $("loginGo").disabled = false; });
-  };
-  $("lu").onkeydown = $("lp").onkeydown = function (e) { if (e.key === "Enter") $("loginGo").click(); };
+    }).catch(function () { msg(mid, bad); }).then(function () { $("loginGo" + k).disabled = false; });
+  }
+  $("loginGo0").onclick = function () { doLogin("admin"); };
+  $("loginGo1").onclick = function () { doLogin("viewer"); };
+  [0, 1].forEach(function (k) {
+    $("lu" + k).onkeydown = $("lp" + k).onkeydown = function (e) { if (e.key === "Enter") $("loginGo" + k).click(); };
+  });
 
   $("setupGo").onclick = function () {
     if (!needCrypto()) { msg("smsg", "المتصفح ما يدعم التشفير المطلوب."); return; }
@@ -459,6 +474,9 @@ body { -webkit-text-size-adjust: 100%; }
     $("loadmsg").textContent = loadState === "fail" ? "تعذر تحميل البيانات. تأكد من الاتصال بالإنترنت." : "جاري التحميل…";
     $("retry").hidden = loadState !== "fail";
     $("setup").hidden = !(ready && !hasAcc); $("login").hidden = !(ready && hasAcc && !logged);
+    var noV = accounts.length < 2;
+    $("lu1").disabled = $("lp1").disabled = $("loginGo1").disabled = noV;
+    if (noV && !logged && hasAcc) $("lmsg1").textContent = "ما في حساب مستخدم بعد.";
     $("userbox").hidden = !logged; $("main").hidden = !logged; $("manage").hidden = role !== "admin";
     if (!logged) return;
     $("who").textContent = user + (role === "admin" ? " (مسؤول)" : "");

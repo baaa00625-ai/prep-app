@@ -1,0 +1,585 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>حاسبة التحضيرات</title>
+<meta name="theme-color" content="#0b6e73">
+<meta name="color-scheme" content="light dark">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="التحضيرات">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="favicon.svg" type="image/svg+xml">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Tajawal:wght@500;700;800&family=IBM+Plex+Sans+Arabic:wght@400;500;600&display=swap">
+<style>
+html { -webkit-tap-highlight-color: transparent; }
+body { margin: 0; }
+
+/* Layout: app-style single column. Header with the edit lock, one card to pick a preparation and the weight to make, then (after unlocking) a management card. */
+:root {
+  --bg: #f3f6f6;
+  --surface: #ffffff;
+  --fg: #14282b;
+  --muted: #5d7377;
+  --line: #d3dfe0;
+  --accent: #0b6e73;
+  --accent-fg: #ffffff;
+  --input: #fff8e1;
+  --input-line: #e6cf86;
+  --ok: #1b7a46;
+  --bad: #b3261e;
+  --head: #0f3d42;
+  --head-fg: #ffffff;
+  --font-display: "Tajawal", "Segoe UI", Tahoma, sans-serif;
+  --font-body: "IBM Plex Sans Arabic", "Segoe UI", Tahoma, sans-serif;
+}
+@media (prefers-color-scheme: dark) {
+  :root:not([data-theme="light"]) {
+    --bg: #0e1a1c; --surface: #152427; --fg: #e4efef; --muted: #8fa8ab; --line: #28403f;
+    --accent: #4fc1c6; --accent-fg: #062527; --input: #2b2a17; --input-line: #6d5f25;
+    --ok: #55c283; --bad: #ff8a80; --head: #1c4a4f; --head-fg: #e4efef;
+    color-scheme: dark;
+  }
+}
+:root[data-theme="dark"] {
+  --bg: #0e1a1c; --surface: #152427; --fg: #e4efef; --muted: #8fa8ab; --line: #28403f;
+  --accent: #4fc1c6; --accent-fg: #062527; --input: #2b2a17; --input-line: #6d5f25;
+  --ok: #55c283; --bad: #ff8a80; --head: #1c4a4f; --head-fg: #e4efef;
+  color-scheme: dark;
+}
+body { background: var(--bg); color: var(--fg); font-family: var(--font-body); font-size: 15px; line-height: 1.6;
+  padding-block: 20px 48px;
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.wrap { max-width: 760px; margin: 0 auto; display: flex; flex-direction: column; gap: 18px; }
+.top { display: flex; align-items: center; gap: 12px; }
+h1 { font-family: var(--font-display); font-weight: 800; font-size: 26px; margin: 0; line-height: 1.2; }
+h2 { font-family: var(--font-display); font-weight: 700; font-size: 18px; margin: 0 0 12px; }
+.sub { color: var(--muted); margin: 2px 0 0; font-size: 13px; }
+.panel { background: var(--surface); border: 1px solid var(--line); border-radius: 10px; padding: 18px; }
+.head { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 12px; margin-bottom: 12px; }
+.head h2 { margin: 0; }
+.save { margin-inline-start: auto; font-size: 13px; font-weight: 600; color: var(--muted); }
+.save.ok { color: var(--ok); } .save.bad { color: var(--bad); }
+.fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 14px; }
+label { display: flex; flex-direction: column; gap: 6px; font-weight: 600; font-size: 13px; color: var(--muted); }
+input, select { font: inherit; color: var(--fg); background: var(--input); border: 1px solid var(--input-line); border-radius: 6px;
+  padding: 9px 10px; min-width: 0; width: 100%; box-sizing: border-box; }
+select { font-size: 17px; font-weight: 600; }
+input:focus-visible, select:focus-visible, button:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+input.num { direction: ltr; text-align: center; font-variant-numeric: tabular-nums; }
+input.big { font-size: 20px; font-weight: 700; }
+.unit { display: flex; align-items: center; gap: 8px; }
+.unit span { color: var(--muted); font-weight: 500; white-space: nowrap; }
+.tot { font-size: 13px; color: var(--muted); margin-top: 6px; }
+.tot b { color: var(--fg); direction: ltr; unicode-bidi: isolate; font-variant-numeric: tabular-nums; }
+.list { display: flex; flex-direction: column; border: 1px solid var(--line); border-radius: 8px; overflow: hidden; }
+.prep { font: inherit; text-align: right; cursor: pointer; background: var(--surface); color: var(--fg); border: 0; border-bottom: 1px solid var(--line);
+  padding: 11px 14px; display: flex; align-items: baseline; gap: 12px; }
+.prep:last-child { border-bottom: 0; }
+.prep:hover { background: color-mix(in srgb, var(--accent) 7%, var(--surface)); }
+.prep[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); }
+.prep b { font-weight: 700; }
+.prep small { margin-inline-start: auto; opacity: .75; font-size: 12px; }
+.empty { color: var(--muted); padding: 14px; text-align: center; border: 1px dashed var(--line); border-radius: 8px; }
+.chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.chip { font: inherit; font-weight: 600; cursor: pointer; border-radius: 999px; padding: 7px 16px; border: 1px solid var(--line);
+  background: var(--surface); color: var(--fg); }
+.chip:hover { border-color: var(--accent); }
+.chip[aria-pressed="true"] { background: var(--accent); color: var(--accent-fg); border-color: var(--accent); }
+.custom { display: flex; flex-wrap: wrap; align-items: end; gap: 14px; margin-top: 14px; }
+.frac { display: flex; align-items: center; gap: 8px; }
+.frac input { width: 72px; }
+.frac span { font-size: 20px; color: var(--muted); }
+.result { margin-inline-start: auto; display: flex; flex-direction: column; gap: 2px; font-weight: 600; font-size: 13px; color: var(--muted); }
+.tablebox { overflow-x: auto; }
+table { width: 100%; border-collapse: collapse; }
+table.in { min-width: 440px; }
+table.out { min-width: 360px; }
+th { background: var(--head); color: var(--head-fg); font-weight: 600; font-size: 13px; padding: 10px 8px; text-align: center; }
+th.want { background: var(--accent); color: var(--accent-fg); }
+th:first-child { border-top-right-radius: 8px; } th:last-child { border-top-left-radius: 8px; }
+td { padding: 6px; border-bottom: 1px solid var(--line); text-align: center; font-variant-numeric: tabular-nums; }
+td.name { text-align: right; padding-inline: 10px; font-weight: 600; }
+td.calc { direction: ltr; font-weight: 600; }
+td.want { font-weight: 700; direction: ltr; font-size: 17px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+td.want input { font-weight: 700; font-size: 17px; }
+td small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
+td.in-name { text-align: right; }
+tr.total td { border-bottom: 0; border-top: 2px solid var(--fg); font-weight: 800; font-family: var(--font-display); font-size: 16px; }
+.acts { display: inline-flex; gap: 4px; }
+.x { background: none; border: 1px solid var(--line); color: var(--muted); border-radius: 6px; width: 32px; height: 32px; cursor: pointer; font-size: 18px; line-height: 1; }
+.x:hover { color: var(--bad); border-color: var(--bad); }
+.bar { display: flex; flex-wrap: wrap; gap: 10px; align-items: center; margin-top: 14px; }
+.btn { font: inherit; font-weight: 600; cursor: pointer; border-radius: 6px; padding: 9px 14px; border: 1px solid var(--accent); background: var(--accent); color: var(--accent-fg); display: inline-flex; align-items: center; gap: 6px; }
+.btn.alt { background: transparent; color: var(--accent); }
+.btn.danger { background: transparent; color: var(--bad); border-color: var(--bad); margin-inline-start: auto; }
+.btn.danger.sure { background: var(--bad); color: var(--surface); }
+.btn svg { width: 16px; height: 16px; }
+.lock { margin-inline-start: auto; white-space: nowrap; flex-shrink: 0; }
+.msg { font-size: 13px; font-weight: 600; color: var(--bad); min-height: 1.4em; margin: 8px 0 0; }
+.msg.ok { color: var(--ok); }
+.note { color: var(--muted); font-size: 13px; margin-top: 8px; }
+.sep { border: 0; border-top: 1px solid var(--line); margin: 18px 0; }
+
+.userbox { margin-inline-start: auto; display: flex; align-items: center; gap: 10px; font-size: 13px; font-weight: 600; color: var(--muted); flex-shrink: 0; }
+.userbox .btn { padding: 6px 12px; }
+.grp { display: flex; flex-direction: column; gap: 10px; border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+.grp h3 { margin: 0; font-family: var(--font-display); font-size: 15px; }
+
+.chk { flex-direction: row; align-items: center; gap: 8px; font-weight: 500; margin-top: 12px; }
+.chk input { width: auto; }
+body { -webkit-text-size-adjust: 100%; }
+</style>
+</head>
+<body>
+<div class="wrap" dir="rtl" lang="ar" id="root">
+  <header class="top">
+    <div>
+      <h1>حاسبة التحضيرات</h1>
+      <p class="sub">اختار المستحضر واكتب الوزن اللي تريد تحضره، وتطلع لك أوزان المواد.</p>
+    </div>
+    <button class="btn alt" id="install" type="button" hidden style="margin-inline-start:auto">تثبيت التطبيق</button>
+    <div class="userbox" id="userbox" hidden>
+      <span id="who"></span>
+      <button class="btn alt" id="logout" type="button">خروج</button>
+    </div>
+  </header>
+
+  <section class="panel" id="loading">
+    <div class="empty" id="loadmsg" style="border:0">جاري التحميل…</div>
+    <div class="bar" style="justify-content:center"><button class="btn alt" id="retry" type="button" hidden>إعادة المحاولة</button></div>
+  </section>
+
+  <section class="panel" id="setup" hidden>
+    <h2>إعداد الحسابات (أول مرة)</h2>
+    <p class="note" style="margin:0 0 14px">اختار حسابين. المسؤول يعدل المستحضرات والأوزان، والمستخدم يشوف ويحسب بس. بيانات المستحضرات تنخزن مشفّرة بكلمة المرور (8 حروف أو أرقام على الأقل، واختارها قوية)، فإذا ضاعت كلمتا المرور ما تنسترجع البيانات.</p>
+    <div class="fields">
+      <div class="grp">
+        <h3>حساب المسؤول (تعديل)</h3>
+        <label for="su0">اسم المستخدم<input id="su0" autocomplete="username"></label>
+        <label for="sp0">كلمة المرور<input id="sp0" type="password" autocomplete="new-password"></label>
+      </div>
+      <div class="grp">
+        <h3>حساب المستخدم (عرض فقط)</h3>
+        <label for="su1">اسم المستخدم<input id="su1" autocomplete="off"></label>
+        <label for="sp1">كلمة المرور<input id="sp1" type="password" autocomplete="off"></label>
+      </div>
+    </div>
+    <div class="bar"><button class="btn" id="setupGo" type="button">حفظ وإنشاء الحسابين</button></div>
+    <p class="msg" id="smsg" role="status"></p>
+  </section>
+
+  <section class="panel" id="login" hidden>
+    <h2>تسجيل الدخول</h2>
+    <div class="fields">
+      <label for="lu">اسم المستخدم<input id="lu" autocomplete="username"></label>
+      <label for="lp">كلمة المرور<input id="lp" type="password" autocomplete="current-password"></label>
+    </div>
+    <label class="chk" for="rem"><input id="rem" type="checkbox"> تذكرني على هذا الجهاز</label>
+    <div class="bar"><button class="btn" id="loginGo" type="button">دخول</button></div>
+    <p class="msg" id="lmsg" role="status"></p>
+  </section>
+
+  <section class="panel" id="main" hidden>
+    <div id="empty" class="empty" hidden>ما في مستحضرات محفوظة بعد.</div>
+    <div id="mainbody" hidden>
+      <div class="fields">
+        <label for="psel">المستحضر<select id="psel"></select></label>
+        <label for="wkg">الوزن المراد تحضيره
+          <span class="unit"><input id="wkg" class="num big" type="number" inputmode="decimal" min="0" step="any"><span>كغم</span></span></label>
+      </div>
+      <p class="tot" id="totline"></p>
+      <div class="chips" id="chips" role="group" aria-label="كم من الوجبة" style="margin-top:14px">
+        <button class="chip" type="button" data-n="1" data-d="1">وجبة كاملة</button>
+        <button class="chip" type="button" data-n="2" data-d="3">ثلثين</button>
+        <button class="chip" type="button" data-n="3" data-d="4">ثلاثة أرباع</button>
+        <button class="chip" type="button" data-n="1" data-d="2">نصف</button>
+        <button class="chip" type="button" data-n="1" data-d="3">ثلث</button>
+        <button class="chip" type="button" data-n="1" data-d="4">ربع</button>
+        <button class="chip" type="button" data-n="1" data-d="5">خُمس</button>
+        <button class="chip" type="button" data-n="1" data-d="10">عُشر</button>
+      </div>
+      <div class="custom">
+        <label for="fn">أو اكتب كسر
+          <span class="frac"><input id="fn" class="num" type="number" inputmode="decimal" min="0" step="any" value="1"><span>/</span><input id="fd" class="num" type="number" inputmode="decimal" min="0" step="any" value="1"></span></label>
+        <div class="result"><span id="plabel"></span></div>
+      </div>
+      <div class="tablebox" style="margin-top:16px">
+        <table class="out">
+          <thead><tr><th style="text-align:right;padding-inline:10px">المادة</th><th>وزنها بالوجبة الكاملة (كغم)</th><th class="want">الوزن المطلوب (كغم)</th></tr></thead>
+          <tbody id="out"></tbody>
+          <tfoot><tr class="total"><td class="name">المجموع</td><td id="oF" class="calc"></td><td id="oW" class="calc"></td></tr></tfoot>
+        </table>
+      </div>
+    </div>
+  </section>
+
+  <section class="panel" id="manage" hidden>
+    <div class="head">
+      <h2>إدارة المستحضرات</h2>
+      <span class="save" id="save" role="status"></span>
+    </div>
+    <div class="bar" style="margin:0 0 14px">
+      <button class="btn" id="pub" type="button" disabled>تنزيل ملف البيانات</button>
+      <button class="btn alt" id="discard" type="button" disabled>تجاهل التغييرات</button>
+      <button class="btn alt" id="newp" type="button" style="margin-inline-start:auto">+ مستحضر جديد</button>
+    </div>
+    <p class="note" style="margin:-4px 0 14px">بعد أي تعديل اضغط «تنزيل ملف البيانات»، وبعدها ارفع الملف (data.json) على GitHub مكان الملف القديم. التغييرات تظهر لكل المستخدمين بعد دقائق.</p>
+    <div id="list" class="list" role="group" aria-label="المستحضرات"></div>
+
+    <div id="editor" hidden>
+      <hr class="sep">
+      <div class="head"><h2>مواد المستحضر</h2></div>
+      <div class="fields">
+        <label for="pname">اسم المستحضر<input id="pname"></label>
+      </div>
+      <div class="tablebox" style="margin-top:14px">
+        <table class="in">
+          <thead><tr><th>المادة</th><th>وزنها في الوجبة الكاملة (كغم)</th><th></th></tr></thead>
+          <tbody id="rows"></tbody>
+          <tfoot><tr class="total"><td class="name">المجموع</td><td id="tP" class="calc"></td><td></td></tr></tfoot>
+        </table>
+      </div>
+      <div class="bar">
+        <button class="btn" id="add" type="button">+ إضافة مادة</button>
+        <button class="btn danger" id="del" type="button">حذف المستحضر</button>
+      </div>
+    </div>
+
+    <hr class="sep">
+    <h2>الحسابات</h2>
+    <div class="fields">
+      <div class="grp">
+        <h3>المسؤول (تعديل)</h3>
+        <label for="au0">اسم المستخدم<input id="au0"></label>
+        <label for="ap0">كلمة مرور جديدة (اتركها فاضية بدون تغيير)<input id="ap0" type="password" autocomplete="new-password"></label>
+      </div>
+      <div class="grp">
+        <h3>المستخدم (عرض فقط)</h3>
+        <label for="au1">اسم المستخدم<input id="au1"></label>
+        <label for="ap1">كلمة مرور جديدة (اتركها فاضية بدون تغيير)<input id="ap1" type="password" autocomplete="new-password"></label>
+      </div>
+    </div>
+    <div class="bar"><button class="btn alt" id="accApply" type="button">تطبيق تغييرات الحسابات</button></div>
+    <p class="msg" id="cmsg" role="status"></p>
+  </section>
+  <p class="note" id="iosnote" hidden>للتثبيت على الآيفون: زر المشاركة ثم «إضافة إلى الشاشة الرئيسية».</p>
+</div>
+<script>
+(function () {
+  var $ = function (id) { return document.getElementById(id); };
+  var num = function (v) { var x = parseFloat(v); return isFinite(x) ? x : 0; };
+  var fmt = function (v, d) { return isFinite(v) ? (Math.round(v * Math.pow(10, d)) / Math.pow(10, d)).toString() : "0"; };
+  var names = { "1/1": "وجبة كاملة", "1/2": "نصف الوجبة", "1/3": "ثلث الوجبة", "1/4": "ربع الوجبة", "1/5": "خُمس الوجبة",
+                "1/10": "عُشر الوجبة", "2/3": "ثلثين من الوجبة", "3/4": "ثلاثة أرباع الوجبة" };
+  var MINPW = 8, ITER = 600000;
+
+  var loadState = "loading", accounts = [], envD = null;
+  var dekRaw = null, dek = null, role = null, user = null, preps = [], sel = null, edSel = null, curSig = "";
+  var dirty = false, delTimer = null, deferredInstall = null;
+
+  var enc = new TextEncoder(), dec = new TextDecoder();
+  function rnd(n) { return crypto.getRandomValues(new Uint8Array(n)); }
+  function b64(buf) { var a = new Uint8Array(buf), s = ""; for (var i = 0; i < a.length; i++) s += String.fromCharCode(a[i]); return btoa(s); }
+  function unb64(s) { var b = atob(s), a = new Uint8Array(b.length); for (var i = 0; i < b.length; i++) a[i] = b.charCodeAt(i); return a; }
+  function kek(pw, salt) {
+    return crypto.subtle.importKey("raw", enc.encode(pw), "PBKDF2", false, ["deriveKey"]).then(function (k) {
+      return crypto.subtle.deriveKey({ name: "PBKDF2", salt: salt, iterations: ITER, hash: "SHA-256" }, k, { name: "AES-GCM", length: 256 }, false, ["encrypt", "decrypt"]);
+    });
+  }
+  function wrap(raw, pw) {
+    var s = rnd(16), i = rnd(12);
+    return kek(pw, s).then(function (k) { return crypto.subtle.encrypt({ name: "AES-GCM", iv: i }, k, raw); })
+      .then(function (ct) { return { s: b64(s), i: b64(i), w: b64(ct) }; });
+  }
+  function unwrap(acc, pw) {
+    return kek(pw, unb64(acc.s)).then(function (k) { return crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(acc.i) }, k, unb64(acc.w)); })
+      .then(function (buf) { return new Uint8Array(buf); });
+  }
+  function dekKey(raw) { return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]); }
+  function encData(key, obj) {
+    var i = rnd(12);
+    return crypto.subtle.encrypt({ name: "AES-GCM", iv: i }, key, enc.encode(JSON.stringify(obj))).then(function (ct) { return { i: b64(i), c: b64(ct) }; });
+  }
+  function decData(key, d) {
+    return crypto.subtle.decrypt({ name: "AES-GCM", iv: unb64(d.i) }, key, unb64(d.c)).then(function (buf) { return JSON.parse(dec.decode(buf)); });
+  }
+
+  function sig(p) { return JSON.stringify([p.name, p.rows]); }
+  function cur() { for (var i = 0; i < preps.length; i++) if (preps[i].id === sel) return preps[i]; return null; }
+  function total(p) { var t = 0; p.rows.forEach(function (r) { t += num(r.w); }); return t; }
+  function setVal(el, v) { if (document.activeElement !== el) el.value = v; }
+  function fraction() { var d = num($("fd").value); return d > 0 ? num($("fn").value) / d : 0; }
+  function setSave(t, cls) { var s = $("save"); s.textContent = t; s.className = "save " + (cls || ""); }
+  function msg(id, t, ok) { $(id).textContent = t; $(id).className = "msg" + (ok ? " ok" : ""); }
+  function markDirty() { dirty = true; $("pub").disabled = false; $("discard").disabled = false; setSave("تغييرات غير محفوظة", "bad"); }
+  function norm(x) { return (x || "").trim().toLowerCase(); }
+  function normalize(list) {
+    return (list || []).map(function (p) {
+      return { id: p.id, name: p.name || "", rows: (p.rows || []).map(function (r) { return { n: r.n || "", w: r.w || 0 }; }) };
+    });
+  }
+  function needCrypto() { return !!(window.crypto && crypto.subtle); }
+
+  /* ---------- session (optional remember on this device) ---------- */
+  function readSess() {
+    var out = null;
+    [localStorage, sessionStorage].forEach(function (st) {
+      try { var v = JSON.parse(st.getItem("prep-sess") || "null"); if (v && !out) out = { u: v.u, k: v.k, store: st }; } catch (e) {}
+    });
+    return out;
+  }
+  function writeSess(remember) {
+    var st = remember ? localStorage : sessionStorage;
+    try { localStorage.removeItem("prep-sess"); sessionStorage.removeItem("prep-sess"); } catch (e) {}
+    try { st.setItem("prep-sess", JSON.stringify({ u: user, k: b64(dekRaw) })); } catch (e) {}
+  }
+  function clearSess() { try { localStorage.removeItem("prep-sess"); sessionStorage.removeItem("prep-sess"); } catch (e) {} }
+
+  /* ---------- load data ---------- */
+  function load() {
+    loadState = "loading"; renderAll();
+    fetch("data.json?" + Date.now(), { cache: "no-store" }).then(function (r) { if (!r.ok) throw new Error("x"); return r.json(); })
+      .then(function (e) {
+        accounts = (e && e.accounts) || []; envD = (e && e.d) || null; loadState = "ok";
+        var ss = readSess();
+        if (ss && accounts.length && envD && needCrypto()) {
+          var acc = findAcc(ss.u), raw = unb64(ss.k);
+          if (acc) return dekKey(raw).then(function (key) { return decData(key, envD).then(function (data) { enter(acc, raw, key, data, ss.store === localStorage); }); })
+            .catch(function () { clearSess(); });
+        }
+      }).catch(function () { loadState = "fail"; }).then(renderAll);
+  }
+  function findAcc(name) {
+    for (var i = 0; i < accounts.length; i++) if (norm(accounts[i].u) === norm(name)) return accounts[i];
+    return null;
+  }
+
+  /* ---------- sign in / setup ---------- */
+  function enter(acc, raw, key, data, remember) {
+    dekRaw = raw; dek = key; role = acc.r; user = acc.u;
+    preps = normalize(data.preps); sel = preps.length ? preps[0].id : null; edSel = null;
+    writeSess(!!remember);
+  }
+  $("loginGo").onclick = function () {
+    if (!needCrypto()) { msg("lmsg", "المتصفح ما يدعم التشفير المطلوب."); return; }
+    var acc = findAcc($("lu").value), pw = $("lp").value, bad = "اسم المستخدم أو كلمة المرور غلط.";
+    if (!acc || !pw) { msg("lmsg", bad); return; }
+    $("loginGo").disabled = true; msg("lmsg", "جاري التحقق…");
+    unwrap(acc, pw).then(function (raw) {
+      return dekKey(raw).then(function (key) { return decData(key, envD).then(function (data) {
+        $("lp").value = ""; msg("lmsg", ""); enter(acc, raw, key, data, $("rem").checked); renderAll();
+      }); });
+    }).catch(function () { msg("lmsg", bad); }).then(function () { $("loginGo").disabled = false; });
+  };
+  $("lu").onkeydown = $("lp").onkeydown = function (e) { if (e.key === "Enter") $("loginGo").click(); };
+
+  $("setupGo").onclick = function () {
+    if (!needCrypto()) { msg("smsg", "المتصفح ما يدعم التشفير المطلوب."); return; }
+    var u0 = $("su0").value.trim(), u1 = $("su1").value.trim(), p0 = $("sp0").value, p1 = $("sp1").value;
+    if (!u0 || !u1) { msg("smsg", "اكتب اسم مستخدم لكل حساب."); return; }
+    if (norm(u0) === norm(u1)) { msg("smsg", "اسما المستخدمين لازم يكونون مختلفين."); return; }
+    if (p0.length < MINPW || p1.length < MINPW) { msg("smsg", "كلمة المرور لازم تكون " + MINPW + " حروف أو أرقام على الأقل."); return; }
+    $("setupGo").disabled = true; msg("smsg", "جاري الإنشاء…");
+    var raw = rnd(32);
+    Promise.all([wrap(raw, p0), wrap(raw, p1), dekKey(raw)]).then(function (r) {
+      accounts = [Object.assign({ u: u0, r: "admin" }, r[0]), Object.assign({ u: u1, r: "viewer" }, r[1])];
+      var example = [{ id: "ex1", name: "مثال: كريم", rows: [{ n: "المادة الفعالة", w: 5 }, { n: "مادة مساعدة 1", w: 57 }, { n: "مادة مساعدة 2", w: 28.5 }, { n: "مادة مساعدة 3", w: 9.5 }] }];
+      enter(accounts[0], raw, r[2], { preps: example }, false);
+      renderAll(); markDirty(); setSave("اضغط «تنزيل ملف البيانات» وارفعه على GitHub حتى تثبت الحسابات", "bad");
+    }, function () { msg("smsg", "تعذر الإنشاء."); }).then(function () { $("setupGo").disabled = false; });
+  };
+
+  $("logout").onclick = function () {
+    if (dirty && !confirmLeave()) return;
+    clearSess(); dekRaw = dek = role = user = null; preps = []; sel = null; edSel = null; dirty = false;
+    load();
+  };
+  function confirmLeave() { setSave("نزّل ملف البيانات أو تجاهل التغييرات قبل الخروج", "bad"); return false; }
+  window.addEventListener("beforeunload", function (e) { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
+
+  /* ---------- export the data file (admin) ---------- */
+  $("pub").onclick = function () {
+    var snap = preps.map(function (p) { return { id: p.id, name: p.name, rows: p.rows.map(function (r) { return { n: r.n, w: num(r.w) }; }) }; });
+    encData(dek, { preps: snap }).then(function (d) {
+      var json = JSON.stringify({ v: 2, accounts: accounts, d: d });
+      var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
+      var a = document.createElement("a"); a.href = url; a.download = "data.json"; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
+      dirty = false; $("pub").disabled = true; $("discard").disabled = true;
+      setSave("✔ نزل الملف. ارفعه على GitHub مكان data.json", "ok");
+    }, function () { setSave("تعذر إنشاء الملف", "bad"); });
+  };
+  $("discard").onclick = function () { dirty = false; location.reload(); };
+
+  /* ---------- accounts (admin) ---------- */
+  $("accApply").onclick = function () {
+    var u0 = $("au0").value.trim(), u1 = $("au1").value.trim(), p0 = $("ap0").value, p1 = $("ap1").value;
+    if (!u0 || !u1) { msg("cmsg", "اكتب اسم مستخدم لكل حساب."); return; }
+    if (norm(u0) === norm(u1)) { msg("cmsg", "اسما المستخدمين لازم يكونون مختلفين."); return; }
+    if ((p0 && p0.length < MINPW) || (p1 && p1.length < MINPW)) { msg("cmsg", "كلمة المرور لازم تكون " + MINPW + " حروف أو أرقام على الأقل."); return; }
+    var jobs = [Promise.resolve(null), Promise.resolve(null)];
+    if (p0) jobs[0] = wrap(dekRaw, p0);
+    if (p1) jobs[1] = wrap(dekRaw, p1);
+    Promise.all(jobs).then(function (r) {
+      accounts[0] = Object.assign({}, accounts[0], { u: u0 }, r[0] || {});
+      accounts[1] = Object.assign({}, accounts[1], { u: u1 }, r[1] || {});
+      var remembered = !!localStorage.getItem("prep-sess");
+      user = accounts[0].u; writeSess(remembered); $("who").textContent = user + " (مسؤول)";
+      $("ap0").value = ""; $("ap1").value = "";
+      msg("cmsg", "اضغط «تنزيل ملف البيانات» وارفعه حتى تثبت التغييرات.", true); markDirty();
+    }, function () { msg("cmsg", "تعذر تطبيق التغييرات."); });
+  };
+
+  /* ---------- rendering ---------- */
+  function renderSelect() {
+    var s = $("psel"); s.innerHTML = "";
+    preps.forEach(function (p) {
+      var o = document.createElement("option"); o.value = p.id; o.textContent = p.name || "بدون اسم"; s.appendChild(o);
+    });
+    if (sel) s.value = sel;
+  }
+  function renderList() {
+    var box = $("list"); box.innerHTML = "";
+    if (!preps.length) {
+      var e = document.createElement("div"); e.className = "empty"; e.textContent = "ما عندك مستحضرات بعد. اضغط «+ مستحضر جديد».";
+      box.className = ""; box.appendChild(e); return;
+    }
+    box.className = "list";
+    preps.forEach(function (p) {
+      var b = document.createElement("button"); b.type = "button"; b.className = "prep";
+      b.setAttribute("aria-pressed", p.id === sel ? "true" : "false");
+      var n = document.createElement("b"); n.textContent = p.name || "بدون اسم";
+      var s = document.createElement("small"); s.textContent = p.rows.length + " مواد";
+      b.appendChild(n); b.appendChild(s);
+      b.onclick = function () { choose(p.id); };
+      box.appendChild(b);
+    });
+  }
+  function choose(id) { sel = id; edSel = null; renderAll(); }
+  function renderAll() {
+    var logged = !!role, ready = loadState === "ok", hasAcc = accounts.length > 0;
+    $("loading").hidden = ready;
+    $("loadmsg").textContent = loadState === "fail" ? "تعذر تحميل البيانات. تأكد من الاتصال بالإنترنت." : "جاري التحميل…";
+    $("retry").hidden = loadState !== "fail";
+    $("setup").hidden = !(ready && !hasAcc); $("login").hidden = !(ready && hasAcc && !logged);
+    $("userbox").hidden = !logged; $("main").hidden = !logged; $("manage").hidden = role !== "admin";
+    if (!logged) return;
+    $("who").textContent = user + (role === "admin" ? " (مسؤول)" : "");
+    renderSelect(); renderList();
+    var p = cur();
+    $("empty").hidden = !!p; $("mainbody").hidden = !p;
+    if (role === "admin") {
+      $("editor").hidden = !p;
+      setVal($("au0"), accounts[0].u); setVal($("au1"), accounts[1].u);
+    }
+    if (!p) return;
+    if (edSel !== sel || sig(p) !== curSig) buildEditor(p);
+    calc();
+  }
+  function buildEditor(p) {
+    edSel = sel; curSig = sig(p);
+    $("pname").value = p.name;
+    var tb = $("rows"), out = $("out"); tb.innerHTML = ""; out.innerHTML = "";
+    p.rows.forEach(function (r, i) {
+      var tr = document.createElement("tr");
+      tr.innerHTML =
+        '<td class="in-name"><input id="n' + i + '" aria-label="اسم المادة"></td>' +
+        '<td><input id="p' + i + '" class="num" type="number" inputmode="decimal" min="0" step="any" aria-label="الوزن بالكغم"></td>' +
+        '<td><span class="acts"><button class="x" type="button" id="u' + i + '" aria-label="تحريك للأعلى">↑</button><button class="x" type="button" id="m' + i + '" aria-label="تحريك للأسفل">↓</button><button class="x" type="button" id="d' + i + '" aria-label="حذف المادة">×</button></span></td>';
+      tb.appendChild(tr);
+      $("n" + i).value = r.n; $("p" + i).value = r.w;
+      $("n" + i).oninput = function () { r.n = this.value; edited(); };
+      $("p" + i).oninput = function () { r.w = this.value; edited(); };
+      $("d" + i).onclick = function () { p.rows.splice(i, 1); buildEditor(p); edited(); };
+      $("u" + i).onclick = function () { if (i > 0) { var t = p.rows[i - 1]; p.rows[i - 1] = p.rows[i]; p.rows[i] = t; buildEditor(p); edited(); } };
+      $("m" + i).onclick = function () { if (i < p.rows.length - 1) { var t = p.rows[i + 1]; p.rows[i + 1] = p.rows[i]; p.rows[i] = t; buildEditor(p); edited(); } };
+      var ot = document.createElement("tr");
+      ot.innerHTML = '<td class="name" id="on' + i + '"></td><td class="calc" id="of' + i + '"></td>' +
+        '<td class="want"><input id="ow' + i + '" class="num" type="number" inputmode="decimal" min="0" step="any" aria-label="الوزن المطلوب بالكغم"><small id="og' + i + '"></small></td>';
+      out.appendChild(ot);
+      $("ow" + i).oninput = function () {
+        var w = num(this.value), full = num(r.w);
+        if (full > 0) { $("fn").value = w; $("fd").value = full; }
+        calc();
+      };
+    });
+  }
+  function edited() { var p = cur(); if (!p) return; curSig = sig(p); calc(); renderSelect(); renderList(); markDirty(); }
+
+  function calc(skipKg) {
+    var p = cur(); if (!p) return;
+    var f = fraction(), sf = 0, sw = 0;
+    p.rows.forEach(function (r, i) {
+      var full = num(r.w), w = full * f;
+      sf += full; sw += w;
+      $("on" + i).textContent = r.n || ("مادة " + (i + 1));
+      $("of" + i).textContent = fmt(full, 4);
+      setVal($("ow" + i), fmt(w, 4));
+      $("og" + i).textContent = fmt(w * 1000, 2) + " غم";
+    });
+    $("tP").textContent = fmt(sf, 4);
+    $("oF").textContent = fmt(sf, 4);
+    $("oW").innerHTML = fmt(sw, 4) + "<small>" + fmt(sw * 1000, 2) + " غم</small>";
+    $("totline").innerHTML = "الوجبة الكاملة من هذا المستحضر: <b>" + fmt(sf, 4) + " كغم</b>";
+    var pk = sf * f;
+    if (!skipKg) setVal($("wkg"), pk ? fmt(pk, 4) : "");
+    var key = fmt(num($("fn").value), 6) + "/" + fmt(num($("fd").value), 6);
+    $("plabel").textContent = "راح تحضّر " + (names[key] || ("كسر " + fmt(num($("fn").value), 4) + "/" + fmt(num($("fd").value), 4)));
+    Array.prototype.forEach.call(document.querySelectorAll(".chip[data-n]"), function (c) {
+      c.setAttribute("aria-pressed", c.dataset.n + "/" + c.dataset.d === key ? "true" : "false");
+    });
+  }
+
+  /* ---------- events ---------- */
+  $("psel").onchange = function () { choose(this.value); };
+  $("pname").oninput = function () { var p = cur(); if (p) { p.name = this.value; edited(); } };
+  $("fn").oninput = $("fd").oninput = function () { calc(); };
+  Array.prototype.forEach.call(document.querySelectorAll(".chip[data-n]"), function (c) {
+    c.onclick = function () { $("fn").value = c.dataset.n; $("fd").value = c.dataset.d; calc(); };
+  });
+  $("wkg").oninput = function () {
+    var p = cur(), b = p ? total(p) : 0, w = num(this.value);
+    if (b > 0) { $("fn").value = w; $("fd").value = b; }
+    calc(true);
+  };
+  $("add").onclick = function () {
+    var p = cur(); if (!p) return;
+    p.rows.push({ n: "", w: 0 }); buildEditor(p); edited(); $("n" + (p.rows.length - 1)).focus();
+  };
+  $("newp").onclick = function () {
+    var p = { id: "p" + Date.now().toString(36), name: "مستحضر جديد", rows: [{ n: "", w: 0 }] };
+    preps.push(p); sel = p.id; edSel = null; renderAll(); markDirty(); $("pname").select();
+  };
+  $("del").onclick = function () {
+    var b = this, p = cur(); if (!p) return;
+    if (!b.classList.contains("sure")) {
+      b.classList.add("sure"); b.textContent = "اضغط مرة ثانية للتأكيد";
+      clearTimeout(delTimer); delTimer = setTimeout(function () { b.classList.remove("sure"); b.textContent = "حذف المستحضر"; }, 4000);
+      return;
+    }
+    b.classList.remove("sure"); b.textContent = "حذف المستحضر";
+    preps = preps.filter(function (x) { return x.id !== p.id; });
+    sel = preps.length ? preps[0].id : null; edSel = null;
+    renderAll(); markDirty();
+  };
+  $("retry").onclick = load;
+
+  /* ---------- install ---------- */
+  window.addEventListener("beforeinstallprompt", function (e) { e.preventDefault(); deferredInstall = e; $("install").hidden = false; });
+  $("install").onclick = function () {
+    if (!deferredInstall) return;
+    deferredInstall.prompt(); deferredInstall.userChoice.then(function () { deferredInstall = null; $("install").hidden = true; });
+  };
+  window.addEventListener("appinstalled", function () { $("install").hidden = true; });
+  if (/iphone|ipad|ipod/i.test(navigator.userAgent) && !window.navigator.standalone) $("iosnote").hidden = false;
+  if ("serviceWorker" in navigator && location.protocol !== "file:") navigator.serviceWorker.register("sw.js").catch(function () {});
+
+  load();
+})();
+</script>
+</body>
+</html>

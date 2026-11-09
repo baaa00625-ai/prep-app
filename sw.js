@@ -1,4 +1,4 @@
-var CACHE = "prep-v1";
+var CACHE = "prep-v2";
 var SHELL = ["./", "index.html", "manifest.webmanifest", "favicon.svg", "icons/icon-192.png", "icons/icon-512.png", "data.json"];
 self.addEventListener("install", function (e) {
   e.waitUntil(caches.open(CACHE).then(function (c) { return c.addAll(SHELL); }).then(function () { return self.skipWaiting(); }));
@@ -13,6 +13,7 @@ self.addEventListener("fetch", function (e) {
   var r = e.request;
   if (r.method !== "GET") return;
   var u = new URL(r.url);
+  if (u.origin !== location.origin) return; /* never touch API calls (GitHub) */
   var key = u.origin === location.origin ? new Request(u.origin + u.pathname) : r;
   e.respondWith(fetch(r).then(function (res) {
     if (res && (res.ok || res.type === "opaque")) { var cp = res.clone(); caches.open(CACHE).then(function (c) { c.put(key, cp); }); }

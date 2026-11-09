@@ -231,7 +231,7 @@ body { -webkit-text-size-adjust: 100%; }
       <button class="btn alt" id="discard" type="button" disabled>تجاهل التغييرات</button>
       <button class="btn alt" id="newp" type="button" style="margin-inline-start:auto">+ مستحضر جديد</button>
     </div>
-    <p class="note" style="margin:-4px 0 14px">بعد أي تعديل اضغط «تنزيل ملف البيانات»، وبعدها ارفع الملف (data.json) على GitHub مكان الملف القديم. التغييرات تظهر لكل المستخدمين بعد دقائق.</p>
+    <p class="note" style="margin:-4px 0 14px">إذا فعّلت «الحفظ التلقائي» (بالأسفل) تُحفظ تعديلاتك تلقائياً وتظهر للمستخدمين بعد دقيقة أو دقيقتين. بدونه: اضغط «تنزيل ملف البيانات» وارفع الملف على GitHub.</p>
     <div id="list" class="list" role="group" aria-label="المستحضرات"></div>
 
     <div id="editor" hidden>
@@ -269,6 +269,17 @@ body { -webkit-text-size-adjust: 100%; }
     </div>
     <div class="bar"><button class="btn alt" id="accApply" type="button">تطبيق تغييرات الحسابات</button></div>
     <p class="msg" id="cmsg" role="status"></p>
+    <h3 style="margin-top:22px">الحفظ التلقائي</h3>
+    <div id="ghOffBox">
+      <p class="note">فعّله مرة وحدة وتنحفظ كل تعديلاتك تلقائياً: افتح <a href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noopener">github.com/settings/personal-access-tokens/new</a> ← الاسم prep-app ← Expiration: 1 year ← Repository access: Only select repositories ← اختر prep-app ← Repository permissions ← Contents: Read and write ← Generate token، وبعدها الصق الرمز هنا. الرمز يبقى بجهازك فقط، لا تشاركه مع أحد.</p>
+      <label for="ghTok">رمز GitHub<input id="ghTok" type="password" autocomplete="off"></label>
+      <div class="bar"><button class="btn alt" id="ghOn" type="button">تفعيل الحفظ التلقائي</button></div>
+    </div>
+    <div id="ghOnBox" hidden>
+      <p class="note">✔ الحفظ التلقائي مفعّل على هذا الجهاز.</p>
+      <div class="bar"><button class="btn alt" id="dl" type="button">تنزيل نسخة احتياطية</button> <button class="btn alt" id="ghOff" type="button">إيقاف</button></div>
+    </div>
+    <p class="msg" id="ghmsg" role="status"></p>
   </section>
   <p class="note" id="iosnote" hidden>للتثبيت على الآيفون: زر المشاركة ثم «إضافة إلى الشاشة الرئيسية».</p>
 </div>
@@ -319,7 +330,54 @@ body { -webkit-text-size-adjust: 100%; }
   function fraction() { var d = num($("fd").value); return d > 0 ? num($("fn").value) / d : 0; }
   function setSave(t, cls) { var s = $("save"); s.textContent = t; s.className = "save " + (cls || ""); }
   function msg(id, t, ok) { $(id).textContent = t; $(id).className = "msg" + (ok ? " ok" : ""); }
-  function markDirty() { dirty = true; $("pub").disabled = false; $("discard").disabled = false; setSave("تغييرات غير محفوظة", "bad"); }
+  function markDirty() { dirty = true; ver++; $("pub").disabled = false; $("discard").disabled = false; if (ghCfg()) { setSave("تغييرات غير محفوظة… سيتم الحفظ تلقائياً", "bad"); scheduleAuto(); } else setSave("تغييرات غير محفوظة", "bad"); }
+  var ver = 0, autoT = null, saving = false;
+  function ghCfg() { try { var c = JSON.parse(localStorage.getItem("prep-gh") || "null"); return c && c.token ? c : null; } catch (e) { return null; } }
+  function ghDefaults() {
+    var h = location.hostname, o = h.indexOf(".github.io") > 0 ? h.split(".")[0] : "baaa00625-ai", r = location.pathname.split("/")[1] || "prep-app";
+    return { owner: o, repo: r };
+  }
+  function ghUI() { var on = !!ghCfg(); $("ghOffBox").hidden = on; $("ghOnBox").hidden = !on; $("pub").textContent = on ? "حفظ الآن" : "تنزيل ملف البيانات"; }
+  function makeJson() {
+    var snap = preps.map(function (p) { return { id: p.id, name: p.name, rows: p.rows.map(function (r) { return { n: r.n, w: num(r.w) }; }) }; });
+    return encData(dek, { preps: snap }).then(function (d) { return JSON.stringify({ v: 2, accounts: accounts, d: d }); });
+  }
+  function utf8b64(str) { return b64(new TextEncoder().encode(str)); }
+  function ghReq(c, method, body) {
+    return fetch("https://api.github.com/repos/" + c.owner + "/" + c.repo + "/contents/data.json" + (method === "GET" ? "?ref=main" : ""), {
+      method: method, cache: "no-store",
+      headers: { "Authorization": "Bearer " + c.token, "Accept": "application/vnd.github+json", "Content-Type": "application/json" },
+      body: body ? JSON.stringify(body) : undefined
+    });
+  }
+  function ghErr(st) { return st === 401 ? "الرمز غير صالح أو منتهي" : st === 403 ? "الرمز ما عنده صلاحية الكتابة (Contents: Read and write)" : st === 404 ? "ما لقيت المستودع أو الرمز غير مخصص له" : "فشل الحفظ (" + st + ")"; }
+  function saveGit() {
+    var c = ghCfg(); if (!c) return Promise.reject(new Error("no token"));
+    var my = ver; saving = true; setSave("جارٍ الحفظ…", "");
+    return makeJson().then(function (json) {
+      function attempt(retry) {
+        return ghReq(c, "GET").then(function (r) {
+          if (r.status === 404) return null;
+          if (!r.ok) throw new Error(ghErr(r.status));
+          return r.json().then(function (j) { return j.sha; });
+        }).then(function (sha) {
+          var body = { message: "تحديث البيانات", content: utf8b64(json), branch: "main" };
+          if (sha) body.sha = sha;
+          return ghReq(c, "PUT", body).then(function (r) {
+            if (r.status === 409 && retry) return attempt(false);
+            if (!r.ok) throw new Error(ghErr(r.status));
+          });
+        });
+      }
+      return attempt(true);
+    }).then(function () {
+      saving = false;
+      if (ver !== my) { scheduleAuto(); return; }
+      dirty = false; $("pub").disabled = true; $("discard").disabled = true;
+      setSave("✔ تم الحفظ على GitHub — تظهر للمستخدمين بعد دقيقة أو دقيقتين", "ok");
+    }, function (e) { saving = false; setSave((e && e.message) || "فشل الحفظ", "bad"); throw e; });
+  }
+  function scheduleAuto() { clearTimeout(autoT); autoT = setTimeout(function () { if (saving) { scheduleAuto(); return; } saveGit().catch(function () {}); }, 3000); }
   function norm(x) { return (x || "").trim().toLowerCase(); }
   function normalize(list) {
     return (list || []).map(function (p) {
@@ -406,21 +464,31 @@ body { -webkit-text-size-adjust: 100%; }
     clearSess(); dekRaw = dek = role = user = null; preps = []; sel = null; edSel = null; dirty = false;
     load();
   };
-  function confirmLeave() { setSave("نزّل ملف البيانات أو تجاهل التغييرات قبل الخروج", "bad"); return false; }
+  function confirmLeave() { setSave("انتظر الحفظ أو نزّل ملف البيانات قبل الخروج", "bad"); return false; }
   window.addEventListener("beforeunload", function (e) { if (dirty) { e.preventDefault(); e.returnValue = ""; } });
 
   /* ---------- export the data file (admin) ---------- */
-  $("pub").onclick = function () {
-    var snap = preps.map(function (p) { return { id: p.id, name: p.name, rows: p.rows.map(function (r) { return { n: r.n, w: num(r.w) }; }) }; });
-    encData(dek, { preps: snap }).then(function (d) {
-      var json = JSON.stringify({ v: 2, accounts: accounts, d: d });
+  function downloadJson() {
+    makeJson().then(function (json) {
       var url = URL.createObjectURL(new Blob([json], { type: "application/json" }));
       var a = document.createElement("a"); a.href = url; a.download = "data.json"; document.body.appendChild(a); a.click(); a.remove();
       setTimeout(function () { URL.revokeObjectURL(url); }, 3000);
-      dirty = false; $("pub").disabled = true; $("discard").disabled = true;
-      setSave("✔ نزل الملف. ارفعه على GitHub مكان data.json", "ok");
     }, function () { setSave("تعذر إنشاء الملف", "bad"); });
+  }
+  $("pub").onclick = function () {
+    if (ghCfg()) { clearTimeout(autoT); saveGit().catch(function () {}); return; }
+    downloadJson(); dirty = false; $("pub").disabled = true; $("discard").disabled = true;
+    setSave("✔ نزل الملف. ارفعه على GitHub مكان data.json", "ok");
   };
+  $("dl").onclick = downloadJson;
+  $("ghOn").onclick = function () {
+    var t = $("ghTok").value.trim(), d = ghDefaults(); if (!t) { $("ghmsg").textContent = "الصق الرمز أولاً"; return; }
+    localStorage.setItem("prep-gh", JSON.stringify({ token: t, owner: d.owner, repo: d.repo }));
+    $("ghmsg").textContent = "جارٍ التجربة…";
+    saveGit().then(function () { $("ghTok").value = ""; $("ghmsg").textContent = "✔ تم التفعيل"; ghUI(); }, function (e) { localStorage.removeItem("prep-gh"); $("ghmsg").textContent = (e && e.message) || "فشل"; ghUI(); });
+  };
+  $("ghOff").onclick = function () { localStorage.removeItem("prep-gh"); $("ghmsg").textContent = "تم الإيقاف"; ghUI(); };
+  ghUI();
   $("discard").onclick = function () { dirty = false; location.reload(); };
 
   /* ---------- accounts (admin) ---------- */

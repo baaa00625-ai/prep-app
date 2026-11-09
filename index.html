@@ -106,6 +106,7 @@ td { padding: 6px; border-bottom: 1px solid var(--line); text-align: center; fon
 td.name { text-align: right; padding-inline: 10px; font-weight: 600; }
 td.calc { direction: ltr; font-weight: 600; }
 td.want { font-weight: 700; direction: ltr; font-size: 17px; background: color-mix(in srgb, var(--accent) 9%, var(--surface)); }
+.wv { display: block; padding: 8px 0 2px; direction: ltr; }
 td.want input { font-weight: 700; font-size: 16px; padding-inline: 4px; }
 td small { display: block; font-weight: 500; color: var(--muted); font-size: 12px; }
 td.in-name { text-align: right; }
@@ -511,10 +512,13 @@ body { -webkit-text-size-adjust: 100%; }
       $("u" + i).onclick = function () { if (i > 0) { var t = p.rows[i - 1]; p.rows[i - 1] = p.rows[i]; p.rows[i] = t; buildEditor(p); edited(); } };
       $("m" + i).onclick = function () { if (i < p.rows.length - 1) { var t = p.rows[i + 1]; p.rows[i + 1] = p.rows[i]; p.rows[i] = t; buildEditor(p); edited(); } };
       var ot = document.createElement("tr");
+      var canEditW = role === "admin";
       ot.innerHTML = '<td class="name" id="on' + i + '"></td><td class="calc" id="of' + i + '"></td>' +
-        '<td class="want"><input id="ow' + i + '" class="num" type="number" inputmode="decimal" min="0" step="any" aria-label="الوزن المطلوب بالكغم"><small id="og' + i + '"></small></td>';
+        '<td class="want">' + (canEditW
+          ? '<input id="ow' + i + '" class="num" type="number" inputmode="decimal" min="0" step="any" aria-label="الوزن المطلوب بالكغم">'
+          : '<span id="ow' + i + '" class="wv"></span>') + '<small id="og' + i + '"></small></td>';
       out.appendChild(ot);
-      $("ow" + i).oninput = function () {
+      if (canEditW) $("ow" + i).oninput = function () {
         var w = num(this.value), full = num(r.w);
         if (full > 0) { $("fn").value = w; $("fd").value = full; }
         calc();
@@ -531,7 +535,7 @@ body { -webkit-text-size-adjust: 100%; }
       sf += full; sw += w;
       $("on" + i).textContent = r.n || ("مادة " + (i + 1));
       $("of" + i).textContent = fmt(full, 4);
-      setVal($("ow" + i), fmt(w, 4));
+      var ow = $("ow" + i); if (ow.tagName === "INPUT") setVal(ow, fmt(w, 4)); else ow.textContent = fmt(w, 4);
       $("og" + i).textContent = fmt(w * 1000, 2) + " غم";
     });
     $("tP").textContent = fmt(sf, 4);
